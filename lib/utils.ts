@@ -4,7 +4,7 @@ import { twMerge } from 'tailwind-merge';
 export const protocol =
   process.env.NODE_ENV === 'production' ? 'https' : 'http';
 export const rootDomain =
-  process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'user-readtalk.vercel.app';
+  process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'soeparnocorp.com';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
