@@ -1,89 +1,100 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Edge Chat</title>
 
 <style>
-/* ================= UI VARIABLES ================= */
-:root {
-  --bg: #ffffff;
-  --panel: #f0f2f5;
-  --border: #ddd;
-  --text: #000;
-}
-body.dark {
-  --bg: #111b21;
-  --panel: #202c33;
-  --border: #2a3942;
-  --text: #e9edef;
-}
-
 * { box-sizing: border-box; }
 body {
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
   background: var(--bg);
-  color: var(--text);
+  color: var(--fg);
 }
 
-/* ================= LAYOUT ================= */
+:root {
+  --bg: #f0f2f5;
+  --fg: #111;
+  --panel: #ffffff;
+  --border: #ddd;
+}
+body.dark {
+  --bg: #111b21;
+  --fg: #e9edef;
+  --panel: #202c33;
+  --border: #2a3942;
+}
+
+/* ===== Layout ===== */
 #app {
   display: flex;
   height: 100vh;
 }
 
-/* ===== SIDEBAR ===== */
+/* ===== Sidebar ===== */
 #sidebar {
-  width: 300px;
+  width: 320px;
   background: var(--panel);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
 
-/* Sidebar header */
 #sidebar-header {
-  height: 48px;
+  position: sticky;
+  top: 0;
+  padding: 10px;
   display: flex;
+  gap: 8px;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
   border-bottom: 1px solid var(--border);
-  font-weight: bold;
+  background: var(--panel);
+  z-index: 2;
 }
 
-/* 3-dot menu */
-#menu {
-  position: relative;
-  cursor: pointer;
-}
-#menu-panel {
-  display: none;
-  position: absolute;
-  right: 0;
-  top: 24px;
-  background: var(--bg);
+#room-name {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  padding: 8px;
-  font-size: 14px;
+  outline: none;
 }
-#menu-panel button {
+
+#menu {
+  cursor: pointer;
+  padding: 6px 8px;
+  user-select: none;
+}
+
+#menu-popup {
+  position: absolute;
+  top: 50px;
+  right: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: none;
+}
+#menu-popup button {
   background: none;
   border: none;
-  color: var(--text);
-  cursor: pointer;
+  padding: 10px 14px;
+  width: 100%;
+  text-align: left;
+  color: var(--fg);
 }
 
-/* Roster stays same ID */
 #roster {
-  flex: 1;
+  padding: 10px;
   overflow-y: auto;
-  padding: 8px;
+  flex: 1;
   font-weight: bold;
 }
 
-/* ===== CHAT AREA ===== */
-#chat-area {
+/* ===== Chat ===== */
+#chat {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -91,98 +102,145 @@ body {
 
 #chatlog {
   flex: 1;
+  padding: 12px;
   overflow-y: auto;
-  padding: 8px;
 }
-#chatlog span.username { font-weight: bold; }
+
+#chatlog p { margin: 0 0 8px; }
+.username { font-weight: bold; }
 
 #chat-input {
-  height: 40px;
   border: none;
   border-top: 1px solid var(--border);
-  padding: 0 12px;
+  padding: 12px;
+  font-size: 16px;
   outline: none;
-  width: 100%;
+  background: var(--panel);
+  color: var(--fg);
 }
 
-/* ================= MOBILE ================= */
-@media(max-width:700px) {
-  #sidebar {
-    width: 100%;
-  }
-  #chat-area {
-    display: none;
-  }
-  body.show-chat #sidebar {
-    display: none;
-  }
-  body.show-chat #chat-area {
-    display: flex;
-  }
+/* ===== Mobile ===== */
+@media (max-width: 700px) {
+  #sidebar { width: 100%; }
+  #chat { display: none; }
+  body.in-chat #sidebar { display: none; }
+  body.in-chat #chat { display: flex; }
 }
 </style>
 </head>
 
 <body>
 <div id="app">
-
-  <!-- ===== SIDEBAR ===== -->
+  <!-- SIDEBAR -->
   <div id="sidebar">
     <div id="sidebar-header">
-      Rooms
-      <div id="menu">⋮
-        <div id="menu-panel">
-          <button id="toggle-theme">Toggle Day / Night</button>
-        </div>
+      <form id="room-form" style="display:flex;flex:1;gap:8px">
+        <input id="room-name" placeholder="Search or create room" />
+      </form>
+      <div id="menu">⋮</div>
+      <div id="menu-popup">
+        <button id="toggle-theme">Toggle Day / Night</button>
       </div>
     </div>
     <div id="roster"></div>
   </div>
 
-  <!-- ===== CHAT ===== -->
-  <form id="chatroom">
-    <div id="chat-area">
-      <div id="chatlog">
-        <div id="spacer"></div>
-      </div>
-      <input id="chat-input">
-    </div>
+  <!-- CHAT -->
+  <form id="chat" action="/fake">
+    <div id="chatlog"></div>
+    <input id="chat-input" placeholder="Type a message" />
   </form>
-
 </div>
 
-<!-- ===== NAME + ROOM FORMS (UNCHANGED) ===== -->
-<form id="name-form">
-  <input id="name-input" placeholder="your name">
-</form>
-<form id="room-form">
-  <input id="room-name" placeholder="room name">
-  <button id="go-public">Go</button>
-  <button id="go-private">Private</button>
-</form>
-
 <script>
-/* ================= UI ONLY JS ================= */
+let ws = null;
+let username = null;
+let roomname = null;
+let isAtBottom = true;
 
-// 3-dot toggle
+const roster = document.getElementById("roster");
+const chatlog = document.getElementById("chatlog");
+const chatInput = document.getElementById("chat-input");
+const roomInput = document.getElementById("room-name");
+const roomForm = document.getElementById("room-form");
+
+const hostname = location.host || "localhost:8787";
+
+/* ===== Menu ===== */
 const menu = document.getElementById("menu");
-const panel = document.getElementById("menu-panel");
-menu.onclick = () => panel.style.display = panel.style.display === "block" ? "none" : "block";
-
-// Theme toggle
-const btn = document.getElementById("toggle-theme");
-if (localStorage.theme === "dark") document.body.classList.add("dark");
-btn.onclick = () => {
+const popup = document.getElementById("menu-popup");
+menu.onclick = () => popup.style.display = popup.style.display === "block" ? "none" : "block";
+document.getElementById("toggle-theme").onclick = () => {
   document.body.classList.toggle("dark");
-  localStorage.theme = document.body.classList.contains("dark") ? "dark" : "light";
+  popup.style.display = "none";
 };
-</script>
 
-<!-- ===== ORIGINAL SCRIPT BELOW (UNTOUCHED) ===== -->
-<script>
-/*  !!! SELURUH KODE CHAT ASLI LOE DIBIARKAN APA ADANYA !!!
-    (dipersingkat di sini demi fokus UI)
-*/
+/* ===== Room handling ===== */
+roomForm.addEventListener("submit", e => {
+  e.preventDefault();
+  roomname = roomInput.value;
+  if (roomname) startChat();
+});
+
+function startChat() {
+  roomname = roomname.replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase();
+  location.hash = "#" + roomname;
+  document.body.classList.add("in-chat");
+  connect();
+}
+
+/* ===== Chat ===== */
+function connect() {
+  const proto = location.protocol === "http:" ? "ws://" : "wss://";
+  ws = new WebSocket(proto + hostname + "/api/room/" + roomname + "/websocket");
+
+  ws.onopen = () => {
+    if (!username) {
+      username = prompt("Your name?");
+    }
+    ws.send(JSON.stringify({ name: username }));
+  };
+
+  ws.onmessage = e => {
+    const data = JSON.parse(e.data);
+    if (data.joined) {
+      roster.appendChild(Object.assign(document.createElement("p"), { innerText: data.joined }));
+    } else if (data.quit) {
+      [...roster.children].forEach(p => p.innerText === data.quit && p.remove());
+    } else if (data.message) {
+      addMessage(data.name, data.message);
+    }
+  };
+
+  ws.onclose = () => setTimeout(connect, 1000);
+}
+
+document.getElementById("chat").addEventListener("submit", e => {
+  e.preventDefault();
+  if (ws && chatInput.value) {
+    ws.send(JSON.stringify({ message: chatInput.value }));
+    chatInput.value = "";
+    chatlog.scrollTop = 1e9;
+  }
+});
+
+function addMessage(name, text) {
+  const p = document.createElement("p");
+  if (name) {
+    const u = document.createElement("span");
+    u.className = "username";
+    u.innerText = name + ": ";
+    p.appendChild(u);
+  }
+  p.appendChild(document.createTextNode(text));
+  chatlog.appendChild(p);
+  if (isAtBottom) chatlog.scrollTop = 1e9;
+}
+
+if (location.hash.length > 1) {
+  roomInput.value = location.hash.slice(1);
+  startChat();
+}
 </script>
 </body>
 </html>
