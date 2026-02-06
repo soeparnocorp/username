@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; margin: 0; }
+
+    /* Sidebar */
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 240px;
+      background: #f9f9f9;
+      border-right: 1px solid #ccc;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    #yourname-form, #room-form, #search-room {
+      margin-bottom: 16px;
+    }
+
+    #room-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    #room-list li {
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    #room-list li:hover {
+      background: #eee;
+    }
+
+    /* Chat area */
+    #chatroom {
+      position: fixed;
+      top: 0;
+      left: 240px;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #chatlog {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    #chatlog span.username { font-weight: bold; }
+    #chat-input {
+      height: 32px;
+      border: none;
+      border-top: 1px solid #ccc;
+      padding-left: 8px;
+      outline: none;
+    }
+
+    @media(max-width:600px) {
+      #sidebar { width: 100%; height: auto; position: relative; border-right: none; }
+      #chatroom { left: 0; top: auto; height: calc(100vh - auto); }
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <form id="yourname-form">
+      <input id="name-input" placeholder="Your name" maxlength="32">
+    </form>
+
+    <form id="room-form">
+      <input id="room-name" placeholder="Room name" maxlength="32">
+      <button id="go-public">Go Public</button>
+      <button id="go-private" type="button">Private Room</button>
+    </form>
+
+    <div id="search-room">
+      <input id="search-input" placeholder="Search rooms">
+      <ul id="room-list"></ul>
+    </div>
+  </div>
+
+  <form id="chatroom">
+    <div id="chatlog"><div id="spacer"></div></div>
+    <input id="chat-input">
+  </form>
+
+<script>
+let currentWebSocket = null;
+let nameInput = document.querySelector("#name-input");
+let roomNameInput = document.querySelector("#room-name");
+let goPublicButton = document.querySelector("#go-public");
+let goPrivateButton = document.querySelector("#go-private");
+let chatroom = document.querySelector("#chatroom");
+let chatlog = document.querySelector("#chatlog");
+let chatInput = document.querySelector("#chat-input");
+let searchInput = document.querySelector("#search-input");
+let roomList = document.querySelector("#room-list");
+
+let username;
+let roomname;
+let hostname = window.location.host || "room.soeparnocorp.workers.dev";
+
+nameInput.addEventListener("input", e => {
+  if(e.target.value.length>32) e.target.value=e.target.value.slice(0,32);
+});
+
+roomNameInput.addEventListener("input", e => {
+  if(e.target.value.length>32) e.target.value=e.target.value.slice(0,32);
+});
+
+// Room search suggestion
+searchInput.addEventListener("input", async e => {
+  let query = e.target.value;
+  if(!query) { roomList.innerHTML=""; return; }
+  let response = await fetch("https://"+hostname+"/api/room-search?q="+encodeURIComponent(query));
+  if(response.ok){
+    let rooms = await response.json();
+    roomList.innerHTML="";
+    rooms.forEach(r=>{
+      let li=document.createElement("li");
+      li.innerText = r;
+      li.addEventListener("click", ()=>{ joinRoom(r); });
+      roomList.appendChild(li);
+    });
+  }
+});
+
+goPublicButton.addEventListener("click", e=>{
+  e.preventDefault();
+  if(roomNameInput.value) joinRoom(roomNameInput.value);
+});
+
+goPrivateButton.addEventListener("click", async e=>{
+  roomNameInput.disabled=true; goPublicButton.disabled=true; e.currentTarget.disabled=true;
+  let response = await fetch("https://"+hostname+"/api/room",{method:"POST"});
+  if(response.ok){
+    joinRoom(await response.text());
+  }else{
+    alert("Something went wrong"); location.reload();
+  }
+});
+
+function joinRoom(name){
+  roomname = name.replace(/[^a-zA-Z0-9_-]/g,"").replace(/_/g,"-").toLowerCase();
+  document.location.hash="#"+roomname;
+  startChat();
+}
+
+function startChat(){
+  chatInput.addEventListener("keydown", e=>{
+    if([38,40,33,34].includes(e.keyCode)){
+      let y=0;
+      if(e.keyCode==38) y=-50;
+      if(e.keyCode==40) y=50;
+      if(e.keyCode==33) y=-chatlog.clientHeight+50;
+      if(e.keyCode==34) y=chatlog.clientHeight-50;
+      chatlog.scrollBy(0,y);
+    }
+  });
+
+  chatroom.addEventListener("submit", e=>{
+    e.preventDefault();
+    if(currentWebSocket){
+      currentWebSocket.send(JSON.stringify({message:chatInput.value}));
+      chatInput.value="";
+      chatlog.scrollBy(0,1e8);
+    }
+  });
+
+  joinWebSocket();
+}
+
+function joinWebSocket(){
+  const wss = location.protocol==="http:"?"ws://":"wss://";
+  let ws = new WebSocket(wss+hostname+"/api/room/"+roomname+"/websocket");
+  currentWebSocket = ws;
+  ws.addEventListener("open", ()=>{ ws.send(JSON.stringify({name:username})); });
+  ws.addEventListener("message", e=>{
+    let data=JSON.parse(e.data);
+    if(data.error) addChatMessage(null,"* Error: "+data.error);
+    else if(data.joined) addRoster(data.joined);
+    else if(data.quit) removeRoster(data.quit);
+    else if(data.ready) addChatMessage(null,"* Room ready!");
+    else addChatMessage(data.name,data.message);
+  });
+  ws.addEventListener("close",()=>{ setTimeout(joinWebSocket,1000); });
+  ws.addEventListener("error",()=>{ setTimeout(joinWebSocket,1000); });
+}
+
+function addChatMessage(name,text){
+  let p=document.createElement("p");
+  if(name){
+    let s=document.createElement("span");
+    s.className="username"; s.innerText=name+": ";
+    p.appendChild(s);
+  }
+  p.appendChild(document.createTextNode(text));
+  chatlog.appendChild(p);
+  chatlog.scrollBy(0,1e8);
+}
+
+function addRoster(name){
+  let p=document.createElement("p"); p.innerText=name; roomList.appendChild(p);
+}
+
+function removeRoster(name){
+  for(let c of roomList.childNodes){
+    if(c.innerText==name){ roomList.removeChild(c); break; }
+  }
+}
+</script>
+</body>
+</html>
